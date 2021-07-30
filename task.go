@@ -18,14 +18,17 @@ type TaskResult struct {
 	err      error         // resulting error
 }
 
+// Name of task
 func (ts *TaskResult) Name() string {
 	return ts.name
 }
 
+// Time is duration of task execution
 func (ts *TaskResult) Time() time.Duration {
 	return ts.execTime
 }
 
+// Error result of task
 func (ts *TaskResult) Error() error {
 	return ts.err
 }
