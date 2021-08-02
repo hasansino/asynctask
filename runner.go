@@ -1,34 +1,61 @@
 package asynctask
 
 import (
+	"context"
 	"sync"
 	"time"
 )
 
 // AsyncRunner is async executor of tasks
 type AsyncRunner struct {
-	tasks []task
+	timeout    time.Duration
+	tasks      []Task
+	middleware []MiddlewareFn
 }
 
 // New creates new empty async runner
 func New() *AsyncRunner {
-	return &AsyncRunner{tasks: make([]task, 0)}
+	return &AsyncRunner{
+		tasks:      make([]Task, 0),
+		middleware: make([]MiddlewareFn, 0),
+	}
 }
 
-// Add function to execute async
-func (l *AsyncRunner) Add(name string, fn taskFn) {
-	l.tasks = append(l.tasks, task{
+// Add Task to execution list
+func (r *AsyncRunner) Add(name string, fn TaskFn) {
+	r.tasks = append(r.tasks, Task{
 		name: name,
 		fn:   fn,
 	})
 }
 
+// Use adds middleware to the chain
+func (r *AsyncRunner) Use(middleware ...MiddlewareFn) {
+	for _, m := range middleware {
+		r.middleware = append(r.middleware, m)
+	}
+}
+
+// SetTimeout for all tasks, unlimited if zero
+// When deadline is reached CancelFn is called on context
+// and task provider is responsible for handling it properly
+func (r *AsyncRunner) SetTimeout(t time.Duration) {
+	r.timeout = t
+}
+
+// Reset runner to initial empty state
+func (r *AsyncRunner) Reset() {
+	r.timeout = 0
+	r.tasks = make([]Task, 0)
+	r.middleware = make([]MiddlewareFn, 0)
+}
+
 // Run all async loaders and collect results
 // Returns slice of errors collected for all executed tasks
-func (l *AsyncRunner) Run() []TaskResult {
-	ch := l.runParallel()
+func (r *AsyncRunner) Run() []TaskResult {
+	ch := r.runParallel()
 
-	results := make([]TaskResult, 0, len(l.tasks))
+	results := make([]TaskResult, 0, len(r.tasks))
 
 	for res := range ch {
 		results = append(results, res)
@@ -39,37 +66,58 @@ func (l *AsyncRunner) Run() []TaskResult {
 
 // RunAsync executes tasks in non-blocking fashion
 // Returns channel to read results from
-func (l *AsyncRunner) RunAsync() <-chan TaskResult {
-	return l.runParallel()
+func (r *AsyncRunner) RunAsync() <-chan TaskResult {
+	return r.runParallel()
 }
 
 // runParallel executes tasks parallel and return channel
 // where results will be sent once tasks are finished.
-func (l *AsyncRunner) runParallel() <-chan TaskResult {
+func (r *AsyncRunner) runParallel() <-chan TaskResult {
 	wg := new(sync.WaitGroup)
-	wg.Add(len(l.tasks))
+	ch := make(chan TaskResult, len(r.tasks))
 
-	ch := make(chan TaskResult, len(l.tasks))
-
-	for i := range l.tasks {
-		go func(ch chan TaskResult, l task) {
-			defer wg.Done()
-			var err error
-			timeStart := time.Now()
-			err = l.fn()
-			execTime := time.Since(timeStart)
-			ch <- TaskResult{
-				name:     l.name,
-				execTime: execTime,
-				err:      err,
-			}
-		}(ch, l.tasks[i])
+	ctx := context.Background()
+	if r.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
 	}
 
-	// wait till all tasks finish
+	wg.Add(len(r.tasks))
+	for i := range r.tasks {
+		go r.subTask(ctx, wg, ch, &r.tasks[i])
+	}
+
+	// wait till all tasks will finish
 	wg.Wait()
 	// close channel, since we are not expecting any writes
 	close(ch)
 
 	return ch
+}
+
+// subTask is background task routine
+func (r *AsyncRunner) subTask(
+	ctx context.Context,
+	wg *sync.WaitGroup, ch chan TaskResult, t *Task,
+) {
+	defer wg.Done()
+
+	var err error
+	ts := time.Now()
+
+	fn := t.fn
+	for i := 0; i < len(r.middleware); i++ {
+		fn = r.middleware[i](fn)
+	}
+
+	err = fn(ctx)
+
+	et := time.Since(ts)
+
+	ch <- TaskResult{
+		name: t.name,
+		time: et,
+		err:  err,
+	}
 }

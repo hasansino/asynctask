@@ -1,34 +1,37 @@
 package asynctask
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
-// taskFn is loaders that are accepted by asyncLoader
-type taskFn func() error
+// TaskFn is loaders that are accepted by asyncLoader
+type TaskFn func(context.Context) error
 
-// task is a single function to load some arbitrary data
-type task struct {
+// Task is a single function to load some arbitrary data
+type Task struct {
 	name string
-	fn   taskFn
+	fn   TaskFn
 }
 
-// TaskResult is async task result which is passed to channel
+// TaskResult is async Task result which is passed to channel
 type TaskResult struct {
-	name     string        // name of task
-	execTime time.Duration // execution duration
-	err      error         // resulting error
+	name string        // name of Task
+	time time.Duration // execution duration
+	err  error         // resulting error
 }
 
-// Name of task
+// Name of Task
 func (ts *TaskResult) Name() string {
 	return ts.name
 }
 
-// Time is duration of task execution
+// Time is duration of Task execution
 func (ts *TaskResult) Time() time.Duration {
-	return ts.execTime
+	return ts.time
 }
 
-// Error result of task
+// Error result of Task
 func (ts *TaskResult) Error() error {
 	return ts.err
 }
