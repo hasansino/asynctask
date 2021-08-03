@@ -5,6 +5,12 @@
 
 asynctask executes tasks (func(context.Context) error) asynchronously with optional context timeout.
 
+## Installation
+
+```bash
+~ $ go get -u github.com/hasansino/asynctask
+```
+
 ## Example
 
 ```go
