@@ -165,7 +165,6 @@ func TestTimeout(t *testing.T) {
 	tasks := []Task{
 		{"test1", func(ctx context.Context) error {
 			for {
-
 				switch err := ctx.Err(); {
 				case err != nil:
 					return err
