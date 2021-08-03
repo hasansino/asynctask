@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.com/hasansino/asynctask.svg?branch=master)](https://travis-ci.com/hasansino/asynctask)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hasansino/asynctask)](https://goreportcard.com/report/github.com/hasansino/asynctask)
+[![Build Status](https://travis-ci.com/hasansino/asynctask.svg?branch=master)](https://travis-ci.com/hasansino/asynctask)
 
 # asynctask
 
